@@ -6,9 +6,9 @@
     <title>Consulta de Cotações - Saúde</title>
     <style>
         :root {
-            --primary: #1e3a8a; /* blue-900 */
+            --primary: #1e3a8a;
             --primary-hover: #1e40af;
-            --secondary: #475569; /* slate-600 */
+            --secondary: #475569;
             --bg-color: #f8fafc;
             --card-bg: #ffffff;
             --border: #e2e8f0;
@@ -286,10 +286,12 @@
             let num = parseFloat(strVal.replace(',','.'));
             if (isNaN(num)) return val;
             
-            // Assume values like 0.15 = 15%. If greater than 1, assume already percentage
-            if (num < 1 && num > -1 && num !== 0) {
+            // Corrige o comportamento do agenciamento e outros percentuais
+            // No Excel, 100% é salvo como 1. Multiplicamos por 100 os números.
+            if (num <= 10 && num >= -10) { 
                 num = num * 100;
             }
+            
             return num.toFixed(2).replace('.', ',') + '%';
         }
 
@@ -416,8 +418,8 @@
                 <div class="grid-section">
                     <div class="section-title">Condições Comerciais</div>
                     ${renderField('Estimativa de Fatura', quote['ESTIMATIVA DE FATURA'], 'currency')}
-                    ${renderField('Faturamento Macro', quote['FATURAMENTO MACRO'], 'currency')}
-                    ${renderField('Faturamento Necessário', quote['FATURAMENTO NECESSÁRIO'], 'currency')}
+                    ${renderField('Faturamento Macro', quote['FATURAMENTO MACRO'], 'percent')}
+                    ${renderField('Faturamento Necessário', quote['FATURAMENTO NECESSÁRIO'], 'percent')}
                     ${renderField('Comissão', quote['COMISSÃO'], 'percent')}
                     ${renderField('Agenciamento', quote['AGENCIAMENTO'], 'percent')}
                     ${renderField('Agravo/Desconto', quote['AGRAVO/DESCONTO'], 'percent')}
