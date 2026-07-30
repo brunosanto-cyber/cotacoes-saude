@@ -109,7 +109,8 @@
         }
         .quote-count {
             color: var(--text-light);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
+            font-weight: 500;
         }
         .actions {
             display: flex;
@@ -221,7 +222,10 @@
             <div class="summary-header">
                 <div>
                     <h2 class="company-name" id="display-company-name">-</h2>
-                    <span class="quote-count" id="display-quote-count">-</span>
+                    <div style="margin-top: 10px; display: flex; align-items: center; gap: 12px;">
+                        <span class="status-badge" id="display-status-top" style="font-size: 1rem; padding: 6px 16px;">-</span>
+                        <span class="quote-count" id="display-quote-count">-</span>
+                    </div>
                 </div>
                 <div class="actions">
                     <button class="secondary-btn" id="copy-btn">Copiar CNPJ</button>
@@ -247,6 +251,7 @@
         const resultsArea = document.getElementById('results-area');
         const displayCompanyName = document.getElementById('display-company-name');
         const displayQuoteCount = document.getElementById('display-quote-count');
+        const displayStatusTop = document.getElementById('display-status-top');
         const quoteTabs = document.getElementById('quote-tabs');
         const quotesContainer = document.getElementById('quotes-container');
         const copyBtn = document.getElementById('copy-btn');
@@ -350,6 +355,11 @@
             displayCompanyName.textContent = companyName + ` (${formatCNPJ(actualCnpj)})`;
             displayQuoteCount.textContent = `${currentResults.length} cotaç${currentResults.length === 1 ? 'ão' : 'ões'} encontrada(s)`;
 
+            // Seta o status da primeira cotação no cabeçalho destacado
+            const firstStatus = currentResults[0]['SITUAÇÃO'] || "-";
+            displayStatusTop.textContent = firstStatus;
+            displayStatusTop.className = 'status-badge ' + getStatusClass(firstStatus);
+
             quoteTabs.innerHTML = '';
             quotesContainer.innerHTML = '';
 
@@ -377,6 +387,11 @@
             document.querySelectorAll('.quote-card').forEach((card, i) => {
                 card.classList.toggle('active', i === activeIndex);
             });
+
+            // Atualiza o status destacado no cabeçalho ao trocar de aba
+            const currentStatus = currentResults[activeIndex]['SITUAÇÃO'] || "-";
+            displayStatusTop.textContent = currentStatus;
+            displayStatusTop.className = 'status-badge ' + getStatusClass(currentStatus);
         }
 
         function renderField(label, value, format = 'text') {
@@ -432,8 +447,8 @@
                     ${renderField('Reajuste Anual', quote['REAJUSTE ANUAL'], 'percent')}
                     ${renderField('Coparticipação', quote['COPARTICIPAÇÃO'], 'percent')}
                     ${renderField('Sinistralidade Congênere', quote['SINISTRALIDADE CONGÊNERE'], 'percent')}
-                    ${renderField('DA', quote['DA'])}
-                    ${renderField('ML', quote['ML'])}
+                    ${renderField('DA', quote['DA'], 'percent')}
+                    ${renderField('ML', quote['ML'], 'percent')}
                     ${renderField('Diluição', quote['DILUIÇÃO'])}
                 </div>
 
