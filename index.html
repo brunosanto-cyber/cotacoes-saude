@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Consulta de Cotações - Saúde</title>
-    <!-- Código adicionado para o ícone da aba do navegador -->
-    <link rel="icon" type="image/png" href="favicon.png">
+    <!-- Ícone da Aba do Navegador -->
+    <link rel="icon" href="https://www.segurosunimed.com.br/favicon.ico">
+    <!-- Biblioteca de Gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         :root {
@@ -195,6 +197,14 @@
         .status-danger { background-color: var(--danger); }
         .status-default { background-color: var(--secondary); }
         
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            margin-top: 2rem;
+        }
+        
         @media (max-width: 768px) {
             .summary-header {
                 flex-direction: column;
@@ -239,6 +249,12 @@
             <div class="tabs" id="quote-tabs"></div>
             
             <div id="quotes-container"></div>
+            
+            <!-- Nova seção do Gráfico -->
+            <div id="chart-container" class="chart-card" style="display: none;">
+                <h3 class="section-title" style="margin-top: 0; color: var(--primary);">Evolução das Taxas Aplicadas</h3>
+                <canvas id="ratesChart" height="100"></canvas>
+            </div>
         </div>
     </div>
 
@@ -246,6 +262,7 @@
         let quotesData = [];
         let currentResults = [];
         let currentCnpjSearched = "";
+        let ratesChartInstance = null; // Variável para controlar o gráfico
 
         const cnpjInput = document.getElementById('cnpj-input');
         const searchBtn = document.getElementById('search-btn');
@@ -257,6 +274,7 @@
         const displayStatusTop = document.getElementById('display-status-top');
         const quoteTabs = document.getElementById('quote-tabs');
         const quotesContainer = document.getElementById('quotes-container');
+        const chartContainer = document.getElementById('chart-container');
         const copyBtn = document.getElementById('copy-btn');
         const exportBtn = document.getElementById('export-btn');
 
@@ -293,19 +311,26 @@
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
         }
 
-        function formatPercent(val) {
-            if (val === undefined || val === null || val === "" || val === "-") return '-';
+        // Nova função interna para obter valor limpo para o gráfico
+        function getRawPercentNumber(val) {
+            if (val === undefined || val === null || val === "" || val === "-") return 0;
             let strVal = String(val);
-            if (strVal.includes('%')) return strVal;
+            let hasPercent = strVal.includes('%');
+            if (hasPercent) {
+                strVal = strVal.replace('%', '');
+            }
+            let num = parseFloat(strVal.replace(',', '.'));
+            if (isNaN(num)) return 0;
             
-            let num = parseFloat(strVal.replace(',','.'));
-            if (isNaN(num)) return val;
-            
-            // Multiplicamos por 100 os números na faixa padrão
-            if (num <= 10 && num >= -10) { 
+            if (num <= 10 && num >= -10 && !hasPercent) { 
                 num = num * 100;
             }
-            
+            return parseFloat(num.toFixed(2));
+        }
+
+        function formatPercent(val) {
+            if (val === undefined || val === null || val === "" || val === "-") return '-';
+            let num = getRawPercentNumber(val);
             return num.toFixed(2).replace('.', ',') + '%';
         }
 
@@ -348,6 +373,7 @@
 
             currentCnpjSearched = rawInput;
             renderResults();
+            renderChart(); // Chama a função para desenhar o gráfico
         }
 
         function renderResults() {
@@ -358,7 +384,6 @@
             displayCompanyName.textContent = companyName + ` (${formatCNPJ(actualCnpj)})`;
             displayQuoteCount.textContent = `${currentResults.length} cotaç${currentResults.length === 1 ? 'ão' : 'ões'} encontrada(s)`;
 
-            // Seta o status da primeira cotação no cabeçalho destacado
             const firstStatus = currentResults[0]['SITUAÇÃO'] || "-";
             displayStatusTop.textContent = firstStatus;
             displayStatusTop.className = 'status-badge ' + getStatusClass(firstStatus);
@@ -391,7 +416,6 @@
                 card.classList.toggle('active', i === activeIndex);
             });
 
-            // Atualiza o status destacado no cabeçalho ao trocar de aba
             const currentStatus = currentResults[activeIndex]['SITUAÇÃO'] || "-";
             displayStatusTop.textContent = currentStatus;
             displayStatusTop.className = 'status-badge ' + getStatusClass(currentStatus);
@@ -475,11 +499,83 @@
             `;
         }
 
+        // Função para Renderizar o Gráfico
+        function renderChart() {
+            const ctx = document.getElementById('ratesChart').getContext('2d');
+            
+            // Destrói o gráfico antigo se houver uma nova busca
+            if (ratesChartInstance) {
+                ratesChartInstance.destroy();
+            }
+
+            chartContainer.style.display = 'block';
+
+            // Prepara os rótulos do eixo X (Cotações/Cenários)
+            const labels = currentResults.map((q, i) => {
+                const cot = q['NÚMERO DA COTAÇÃO'];
+                const cen = q['CENÁRIO'];
+                if (cot && cen) return `Cot. ${cot} (Cen. ${cen})`;
+                if (cot) return `Cot. ${cot}`;
+                return `Cenário ${i + 1}`;
+            });
+
+            // Extrai os dados numéricos limpos
+            const dataAgravo = currentResults.map(q => getRawPercentNumber(q['AGRAVO/DESCONTO']));
+            const dataDA = currentResults.map(q => getRawPercentNumber(q['DA']));
+            const dataML = currentResults.map(q => getRawPercentNumber(q['ML']));
+
+            // Cria o novo gráfico
+            ratesChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Agravo/Desconto (%)',
+                            data: dataAgravo,
+                            backgroundColor: '#ef4444', // Vermelho
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'DA (%)',
+                            data: dataDA,
+                            backgroundColor: '#1e3a8a', // Azul Primário
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'ML (%)',
+                            data: dataML,
+                            backgroundColor: '#10b981', // Verde Sucesso
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { 
+                            position: 'bottom',
+                            labels: { font: { family: "'Segoe UI', sans-serif" } }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         function exportToCSV() {
             if (!currentResults.length) return;
             
             const headers = Object.keys(currentResults[0]);
-            
             let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
             csvContent += headers.join(";") + "\n";
             
